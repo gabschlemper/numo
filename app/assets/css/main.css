@@ -1,0 +1,21 @@
+/**
+ * app/assets/css/main.css
+ *
+ * The ONLY place raw design values (font stacks, custom radii, custom
+ * breakpoints) are ever declared. Everything below becomes a CSS
+ * variable that Tailwind/Nuxt UI expose as a token — components then
+ * consume the token (`font-sans`, `rounded-[--ui-radius]`, `bg-primary`,
+ * ...), never the raw value. If a component needs a color, size or
+ * radius that isn't a token yet, the fix is to add the token here, not
+ * to hardcode it at the call site.
+ */
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+:root {
+  --ui-radius: 0.5rem;
+}
