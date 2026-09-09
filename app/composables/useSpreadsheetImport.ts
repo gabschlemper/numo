@@ -13,7 +13,13 @@ import { countValid } from '~/types/import'
 
 const SAMPLE_NAMES = ['Posto Ipiranga', 'Supermercado Fort', 'Farmácia', 'Ifood', 'Cinema', 'Estacionamento']
 
-function simulateFileAnalysis(file: File): ImportAnalysisResult {
+// A raw card statement (Nubank's own CSV export, for instance, is just
+// `date,title,amount` — see ImportarNubank.gs in the real spreadsheet
+// system) never carries a "which card" column of its own: you know
+// which card it is because you're the one uploading that card's
+// statement. So the account isn't parsed from the file — it's picked
+// once, up front, and applied to every row that comes out of it.
+function simulateFileAnalysis(file: File, account: string): ImportAnalysisResult {
   // Deterministic simulation for the prototype — the real
   // implementation only swaps out this function for a genuine
   // .xlsx/.csv parser.
@@ -34,7 +40,7 @@ function simulateFileAnalysis(file: File): ImportAnalysisResult {
           date: '2026-10-01',
           description: SAMPLE_NAMES[index % SAMPLE_NAMES.length] ?? 'Lançamento importado',
           category: '',
-          account: 'Nubank',
+          account,
           method: 'Crédito',
           amount: 50 + index * 12.3,
           type: 'Variável',
@@ -51,6 +57,7 @@ function simulateFileAnalysis(file: File): ImportAnalysisResult {
 
 export function useSpreadsheetImport() {
   const activeStep = ref(0)
+  const account = ref('')
   const file = ref<File | null>(null)
   const analyzing = ref(false)
   const result = ref<ImportAnalysisResult | null>(null)
@@ -58,11 +65,12 @@ export function useSpreadsheetImport() {
   const totalValid = computed(() => (result.value ? countValid(result.value) : 0))
 
   async function analyze(selectedFile: File): Promise<void> {
+    if (!account.value) return
     file.value = selectedFile
     analyzing.value = true
     try {
       await new Promise((resolve) => setTimeout(resolve, 400))
-      result.value = simulateFileAnalysis(selectedFile)
+      result.value = simulateFileAnalysis(selectedFile, account.value)
       activeStep.value = 1
     } finally {
       analyzing.value = false
@@ -79,12 +87,14 @@ export function useSpreadsheetImport() {
 
   function reset(): void {
     activeStep.value = 0
+    account.value = ''
     file.value = null
     result.value = null
   }
 
   return {
     activeStep,
+    account,
     file,
     analyzing,
     result,

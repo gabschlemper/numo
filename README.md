@@ -1,6 +1,6 @@
 # Numo
 
-Protótipo funcional (frontend, dado mockado) da tela de Lançamentos e todos os seus fluxos: filtros, edição individual, edição em massa, duplicação, exclusão em massa, adição em massa e importação de planilha de faturas.
+Protótipo funcional (frontend, dado mockado) da tela de Lançamentos e todos os seus fluxos: filtros, edição individual, edição em massa, duplicação, exclusão em massa, adição em massa e importação de planilha de faturas — além de login, cadastro, esqueci a senha e logout (também mockados).
 
 Ver `ARCHITECTURE.md` para as decisões de organização de código (SOLID, onde cada coisa vive e por quê).
 
@@ -11,7 +11,9 @@ npm install
 npm run dev
 ```
 
-Abra http://localhost:3000 — redireciona direto para `/transactions`.
+Abra http://localhost:3000 — pede login e redireciona pra `/transactions` depois de autenticado.
+
+Contas de teste já cadastradas: `malu@numo.app` e `gabi@numo.app`, senha `numo123` (ou crie uma conta nova pelo próprio fluxo de cadastro).
 
 ## Scripts
 

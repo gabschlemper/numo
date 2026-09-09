@@ -11,6 +11,7 @@ import type { StepperItem } from '@nuxt/ui'
 import type { TransactionDraft } from '~/types/transaction'
 import { countDuplicates, countErrors } from '~/types/import'
 import { useSpreadsheetImport } from '~/composables/useSpreadsheetImport'
+import { ACCOUNTS } from '~/constants/referenceOptions'
 
 const open = defineModel<boolean>('open', { required: true })
 
@@ -18,7 +19,7 @@ const props = defineProps<{ importing: boolean }>()
 
 const emit = defineEmits<{ import: [drafts: TransactionDraft[]] }>()
 
-const { activeStep, analyzing, result, totalValid, analyze, advanceToReview, goBack, reset } = useSpreadsheetImport()
+const { activeStep, account, analyzing, result, totalValid, analyze, advanceToReview, goBack, reset } = useSpreadsheetImport()
 
 const selectedFile = ref<File | null>(null)
 
@@ -35,6 +36,34 @@ function markImported(): void {
 }
 
 defineExpose({ markImported })
+
+// Three columns on purpose, not four: a real card statement (Nubank's
+// own CSV export is literally `date,title,amount`) never carries a
+// "which card" column — you know that from which statement you're
+// uploading, which is why the account is picked once above, not parsed
+// per row. Plain CSV (not .xlsx) so this needs no extra dependency;
+// semicolon-delimited and comma-decimal because that's what Excel/Sheets
+// in pt-BR locale expect, and a UTF-8 BOM so accents open correctly in
+// Excel.
+const TEMPLATE_CSV = [
+  'Data compra;Descrição;Valor (R$)',
+  '01/10/2026;Posto Ipiranga;124,30',
+  '02/10/2026;Supermercado Fort;389,90',
+  '03/10/2026;Farmácia;58,40'
+].join('\n')
+
+function downloadTemplate(): void {
+  const BOM = '﻿' // makes Excel read UTF-8 accents correctly
+  const blob = new Blob([BOM + TEMPLATE_CSV], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'planilha-modelo-numo.csv'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
 
 const STEPS: StepperItem[] = [
   { title: 'Enviar planilha', icon: 'i-lucide-upload' },
@@ -73,17 +102,34 @@ function handleImportConfirm(): void {
 
       <div v-if="activeStep === 0" class="flex flex-col gap-4">
         <ol class="list-decimal space-y-1 pl-5 text-sm text-muted">
-          <li>Baixe a <strong>planilha modelo Numo</strong> (.xlsx) — já vem com as colunas certas.</li>
-          <li>Rode o script de importação que fornecemos para puxar as faturas do(s) seu(s) cartão(ões) direto para a planilha.</li>
-          <li>Suba o arquivo preenchido abaixo.</li>
+          <li>Diga de qual cartão/conta é essa fatura — vale para todas as linhas do arquivo.</li>
+          <li>Baixe a <strong>planilha modelo Numo</strong> (.csv) — já vem com as colunas certas.</li>
+          <li>Preencha uma linha por lançamento da fatura (data, descrição, valor) e suba o arquivo abaixo.</li>
         </ol>
 
+        <USelectMenu
+          v-model="account"
+          :items="ACCOUNTS"
+          placeholder="De qual cartão/conta é essa fatura?"
+          icon="i-lucide-credit-card"
+        />
+
         <div class="flex gap-2">
-          <UButton label="Baixar planilha modelo" icon="i-lucide-file-down" color="neutral" variant="outline" size="sm" />
-          <UButton label="Ver instruções do script" icon="i-lucide-terminal" color="neutral" variant="outline" size="sm" />
+          <UButton label="Baixar planilha modelo" icon="i-lucide-file-down" color="neutral" variant="outline" size="sm" @click="downloadTemplate" />
+          <UPopover>
+            <UButton label="Ver instruções" icon="i-lucide-circle-help" color="neutral" variant="outline" size="sm" />
+            <template #content>
+              <div class="flex max-w-sm flex-col gap-2 p-4 text-sm">
+                <p class="font-medium">Por enquanto, o preenchimento é manual</p>
+                <p class="text-muted">Abra a planilha modelo baixada e preencha uma linha por lançamento com data, descrição e valor — sem coluna de cartão, porque isso já foi definido acima para o arquivo inteiro (é assim que a fatura real do Nubank também vem: sem essa informação, já que cada fatura já é de um cartão só).</p>
+                <p class="text-muted">Puxar isso automaticamente da fatura ainda não existe aqui — e, como este é um protótipo, a leitura do arquivo também é simulada por enquanto: qualquer planilha que você subir serve para testar o fluxo completo.</p>
+              </div>
+            </template>
+          </UPopover>
         </div>
 
         <UFileUpload
+          v-if="account"
           v-model="selectedFile"
           accept=".xlsx,.csv"
           label="Arraste sua planilha aqui"
@@ -91,6 +137,13 @@ function handleImportConfirm(): void {
           icon="i-lucide-upload"
           :loading="analyzing"
           class="min-h-40 w-full"
+        />
+        <UAlert
+          v-else
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-info"
+          description="Escolha o cartão/conta acima para liberar o envio do arquivo."
         />
       </div>
 
@@ -106,11 +159,8 @@ function handleImportConfirm(): void {
           <div class="flex items-center justify-between rounded-md bg-success-50 px-3 py-1.5 dark:bg-success-950">
             <span class="font-medium">Valor (R$)</span><span>→ Valor <UIcon name="i-lucide-check" class="text-success" /></span>
           </div>
-          <div class="flex items-center justify-between rounded-md bg-warning-50 px-3 py-1.5 dark:bg-warning-950">
-            <span class="font-medium">Cartão</span><span>→ Conta <UIcon name="i-lucide-triangle-alert" class="text-warning" /></span>
-          </div>
         </div>
-        <p class="text-xs text-muted">Categoria, Tipo e Devedor não vêm da fatura — você define na revisão ou em massa depois.</p>
+        <p class="text-xs text-muted">Conta: todas as linhas entram como <strong>{{ account }}</strong>, como definido no passo anterior. Categoria, Tipo e Devedor não vêm da fatura — você define na revisão ou em massa depois.</p>
       </div>
 
       <div v-else-if="activeStep === 2 && result" class="flex flex-col gap-4">
