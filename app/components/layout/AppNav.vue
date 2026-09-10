@@ -59,9 +59,23 @@ async function handleLogout(): Promise<void> {
 
 // "Sair" gets `color: 'error'` on purpose — it's the one destructive,
 // end-of-session action in this menu, and Nuxt UI's error color gives
-// it a distinct red hover/icon tint instead of blending in with a
-// future "Perfil" or "Configurações" item that would sit here too.
+// it a distinct red hover/icon tint instead of blending in with the
+// "Perfil e configurações" item that now sits above it. The two are
+// in separate groups so a divider falls between them: the gap is
+// what stops a hurried click on "Configurações" from landing on
+// "Sair".
+//
+// Configurações fica aqui, e não na navegação principal: a barra
+// lateral é para os dados (Lançamentos, Resumo, Listas), e conta é
+// do usuário, não do conteúdo — é onde as pessoas já procuram por
+// convenção.
 const accountMenuItems = computed(() => [
+  [{
+    label: 'Perfil e configurações',
+    icon: 'i-lucide-settings',
+    to: '/settings',
+    onSelect: () => emit('navigate')
+  }],
   [{ label: 'Sair', icon: 'i-lucide-log-out', color: 'error' as const, onSelect: handleLogout }]
 ])
 </script>

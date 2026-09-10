@@ -51,6 +51,20 @@ export function useAuth() {
     }
   }
 
+  /**
+   * Re-pergunta ao repositório quem está logado e atualiza o estado.
+   *
+   * Diferente de `restoreSession`, que roda uma vez por carga e
+   * depois é no-op: isto é para quando os DADOS do usuário mudaram
+   * (a tela de Perfil trocou o nome) e o cabeçalho, o avatar e o
+   * menu precisam refletir isso na hora. Re-perguntar, em vez de a
+   * tela de Perfil escrever direto em `user`, mantém o repositório
+   * como fonte da verdade — que é como vai funcionar com servidor.
+   */
+  async function refreshUser(): Promise<void> {
+    user.value = await repository.getCurrentUser()
+  }
+
   async function login(credentials: LoginCredentials): Promise<User> {
     return run(async () => {
       const loggedInUser = await repository.login(credentials)
@@ -93,6 +107,7 @@ export function useAuth() {
     error: readonly(error),
     isAuthenticated,
     restoreSession,
+    refreshUser,
     login,
     signup,
     requestPasswordReset,

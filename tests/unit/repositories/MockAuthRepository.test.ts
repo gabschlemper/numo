@@ -1,19 +1,20 @@
-// MockAuthRepository keeps its "accounts table" at module scope (see
-// that file's header comment) so it survives a page reload the same
-// way a real backend's database would. That's exactly what makes it
-// awkward to unit-test: every `it()` needs a FRESH module instance
-// (via `vi.resetModules()` + a dynamic re-import), otherwise a signup
-// in one test would silently still exist in the next one. Clearing
-// `localStorage` (done globally in tests/setup.ts's beforeEach) is what
-// makes that fresh module fall back to the two seed accounts again.
-import { describe, expect, it, vi } from 'vitest'
-import type { MockAuthRepository as MockAuthRepositoryType } from '~/repositories/MockAuthRepository'
+// A "tabela de contas" vive no `MockAccountStore` (ver o cabeçalho
+// daquele arquivo) e sobrevive a um reload como a base de um backend
+// real sobreviveria. Cada `it()` precisa da sua, senão um cadastro
+// feito num teste continuaria existindo no seguinte.
+//
+// Antes isso exigia `vi.resetModules()` + re-import dinâmico, porque
+// o array era estado de módulo. Agora o store é injetado no
+// construtor, então basta criar um novo — e `localStorage` limpo
+// (feito no beforeEach global de tests/setup.ts) faz esse store novo
+// nascer com as duas contas semente.
+import { describe, expect, it } from 'vitest'
+import { MockAuthRepository } from '~/repositories/MockAuthRepository'
+import { MockAccountStore } from '~/repositories/mock/MockAccountStore'
 import { DEMO_ACCOUNTS, DEMO_PASSWORD } from '~/constants/demoAccounts'
 
-async function freshRepository(): Promise<MockAuthRepositoryType> {
-  vi.resetModules()
-  const { MockAuthRepository } = await import('~/repositories/MockAuthRepository')
-  return new MockAuthRepository()
+async function freshRepository(): Promise<MockAuthRepository> {
+  return new MockAuthRepository(new MockAccountStore())
 }
 
 const [malu] = DEMO_ACCOUNTS

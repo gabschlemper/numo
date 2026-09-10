@@ -1,10 +1,12 @@
 # Numo
 
-Protótipo funcional (frontend, dado mockado) de três telas e seus fluxos:
+Protótipo funcional (frontend, dado mockado) de quatro telas e seus fluxos:
 
 - **Lançamentos** — filtros, busca, ordenação, paginação, resumo, edição individual e em massa, duplicação, exclusão em massa, adição em massa e importação de planilha de faturas.
 - **Resumo mensal** — receitas, despesas e saldo por mês de competência, com gráfico de tendência, ranking de gastos por categoria e período configurável.
 - **Listas** — categorias, contas e devedores editáveis, com renomeação que propaga para os lançamentos e exclusão que oferece reatribuição em vez de apagar em cascata.
+
+- **Perfil e configurações** — nome, troca de senha e tema (claro / escuro / sistema).
 
 Mais login, cadastro, esqueci a senha e logout (também mockados).
 

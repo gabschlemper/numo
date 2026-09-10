@@ -12,7 +12,8 @@ Ele foi escrito a partir do que as telas realmente consomem hoje (ver `ARCHITECT
 | **Erros** | **Implementado.** `app/types/apiError.ts` é a forma descrita em [Formato de erro](#formato-de-erro), já usada pela UI para mostrar erro por campo. |
 | **Resumo mensal** | **Implementado contra este contrato.** `SummaryRepository` + `MockSummaryRepository` devolvem `{ months, byCategory }` com as regras abaixo (meses sem buraco, `byCategory` só de despesas). A agregação é a função pura `summarizeByMonth` — que continua valendo, testada, como especificação executável do que o servidor tem que devolver. |
 | Lançamentos | Porta existente, **assinatura antiga**: `list()` sem query, filtro/ordenação/paginação no cliente. |
-| Auth / Perfil / Resumo / Importação | Proposta. |
+| **Perfil** | **Implementado contra este contrato.** `ProfileRepository` + `MockProfileRepository` cobrem `PATCH /me` e `POST /me/password`, com `validation_failed` + `fields` (`name`, `currentPassword`, `newPassword`) e `unauthenticated` quando não há sessão. |
+| Auth / Importação | Proposta. |
 
 A seção [O que muda no frontend](#o-que-muda-no-frontend-quando-isso-existir) lista o que falta ajustar nas áreas ainda não implementadas.
 

@@ -104,6 +104,24 @@ Mês sem lançamento vira coluna vazia, não some: um gráfico que pula mês enc
 
 A tabela "Mês a mês" não é redundância do gráfico: é a via de acesso para leitor de tela, daltonismo e impressão, é onde estão os valores exatos (o gráfico só rotula no hover), e é o que entrega o período inteiro num celular, onde o gráfico rola na horizontal.
 
+## Perfil e configurações
+
+`ProfileRepository` é porta separada de `AuthRepository`, pela mesma razão que `SummaryRepository` não virou método de `TransactionRepository`: no contrato são recursos distintos (`/auth/*` vs `/me`), e trocar o próprio nome não é autenticação. `AuthRepository` responde "quem é você e como você entra"; `ProfileRepository` responde "mude isto em você".
+
+Três decisões que valem registro:
+
+- **A conta editada vem da SESSÃO, nunca de um id mandado pela tela.** A porta não aceita id de usuário — se aceitasse, existiria um caminho em que o cliente escolhe qual conta editar. É o tipo de brecha que nasce no mock e atravessa para o adaptador real por imitação.
+- **A senha atual é exigida mesmo com o usuário logado**, e é conferida **antes** de validar a nova. Dizer "a nova senha é curta demais" para quem errou a atual entrega a informação de que a atual estava certa.
+- **`useProfile` não guarda o usuário.** Quem guarda é `useAuth`; depois de salvar, `useProfile` chama `useAuth().refreshUser()` para o repositório continuar sendo a fonte da verdade. A alternativa (escrever direto no estado) funcionaria hoje e passaria a mentir no dia em que o servidor normalizasse algo — um nome com espaços duplicados voltaria limpo do servidor e sujo na tela. Sem esse refresh, o nome muda no formulário e o avatar da barra lateral continua com o antigo.
+
+O e-mail é somente leitura, com o motivo escrito na tela: trocar e-mail de login é fluxo de verificação, não campo de formulário. Um input desabilitado sem explicação só faz o usuário clicar nele.
+
+### `MockAccountStore`
+
+Mesma história do `MockDataStore`, um nível acima: a tabela de contas saiu de dentro de `MockAuthRepository` quando o Perfil apareceu, porque trocar a senha mexe na MESMA conta que o login lê. Com stores separados, o usuário trocaria a senha e continuaria entrando com a antiga — e nenhum teste do adaptador de perfil perceberia.
+
+Efeito colateral bom: os testes de auth deixaram de precisar de `vi.resetModules()` + re-import dinâmico para se isolarem. Agora cada um cria o seu store no construtor.
+
 ## Erros: `ApiError`, não string solta
 
 `types/apiError.ts` implementa o formato que `API-CONTRACT.md` define: `code`, `message`, `fields` e `details`.
