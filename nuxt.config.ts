@@ -50,6 +50,12 @@ export default defineNuxtConfig({
 
   app: {
     head: {
+      // `lang` não é detalhe: leitores de tela usam ele para escolher
+      // a pronúncia, e os controles nativos (o `<input type="month">`
+      // do Resumo, por exemplo) nomeiam os meses no idioma do
+      // documento — sem isso, um app inteiro em português mostra
+      // "April 2026" no seletor de período.
+      htmlAttrs: { lang: 'pt-BR' },
       title: 'Numo',
       meta: [
         { name: 'description', content: 'Controle financeiro flexível — pessoal ou compartilhado.' }

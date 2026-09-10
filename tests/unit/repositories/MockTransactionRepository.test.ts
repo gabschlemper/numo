@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { MockTransactionRepository } from '~/repositories/MockTransactionRepository'
+import { MockDataStore } from '~/repositories/mock/MockDataStore'
 import { TRANSACTIONS_SEED } from '~/constants/transactionsSeed'
 import type { Transaction, TransactionDraft } from '~/types/transaction'
 
@@ -58,7 +59,11 @@ describe('MockTransactionRepository', () => {
   let repository: MockTransactionRepository
 
   beforeEach(() => {
-    repository = new MockTransactionRepository()
+    // Store próprio por teste. O default do construtor é um
+    // singleton de módulo (é assim que o app faz Listas e Lançamentos
+    // enxergarem os mesmos dados) — usá-lo aqui acoplaria todos os
+    // casos entre si, cada um herdando as escritas do anterior.
+    repository = new MockTransactionRepository(new MockDataStore())
   })
 
   describe('list', () => {

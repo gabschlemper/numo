@@ -1,9 +1,23 @@
 // app/constants/referenceOptions.ts
 //
-// Stand-in for what will later be a user-editable "Listas" table
-// (categories/accounts/methods are fixed for now; nothing in the UI
-// assumes these arrays are static — swapping this for an API call
-// doesn't change any component that consumes them).
+// Este arquivo guarda DUAS coisas de naturezas diferentes, e a
+// distinção importa:
+//
+// 1. METHODS / TYPES / STATUS / REIMBURSABLE_OPTIONS — uniões
+//    FECHADAS do domínio (ver `types/transaction.ts`). São código,
+//    não dado: uma forma de pagamento nova mexe em tipo, validação e
+//    regra de resumo. Os componentes importam estas daqui, direto.
+//
+// 2. CATEGORIES / ACCOUNTS / DEBTORS — hoje são apenas o SEED das
+//    listas editáveis. Nenhum componente as lê mais: desde a tela de
+//    Listas, categorias/contas/devedores vêm de
+//    `ReferenceListRepository` via `useReferenceOptions()`, porque o
+//    usuário pode criar e renomear. O único consumidor destas três é
+//    `repositories/mock/MockDataStore.ts`, que as usa para popular o
+//    mock — exatamente como `transactionsSeed.ts`.
+//
+//    Quando a API existir, estas três somem daqui: o servidor passa a
+//    ser a fonte delas. As de cima ficam.
 import type { PaymentMethod, TransactionStatus, ReimbursementStatus, TransactionType } from '~/types/transaction'
 
 // Typing note: Nuxt UI's `USelectMenu` expects a mutable `items` array

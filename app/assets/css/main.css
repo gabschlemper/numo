@@ -18,4 +18,37 @@
 
 :root {
   --ui-radius: 0.5rem;
+
+  /*
+   * Cores das séries do gráfico do Resumo mensal.
+   *
+   * Elas moram aqui, e não num componente, pela mesma regra do resto
+   * do projeto: valor cru de cor é token. Mas há um segundo motivo,
+   * específico de gráfico — os passos abaixo NÃO foram escolhidos a
+   * olho. Foram validados contra as seis checagens de paleta
+   * (banda de luminosidade, piso de croma, separação para daltonismo,
+   * piso de visão normal, contraste com a superfície) nos dois modos:
+   *
+   *   claro  #16a34a / #2563eb → ΔE 30.3 deutan, 33.3 normal
+   *   escuro #16a34a / #3b82f6 → ΔE 27.5 deutan, 29.4 normal
+   *
+   * O alvo é ΔE >= 8 para daltonismo e >= 15 para visão normal, então
+   * as duas séries ficam bem acima do piso. Trocar um destes valores
+   * sem revalidar pode passar despercebido em revisão e ser
+   * indistinguível para ~1 em 12 leitores homens.
+   *
+   * O modo escuro tem passo PRÓPRIO no azul (não é o mesmo valor
+   * clareado automaticamente): #2563eb sai da banda de luminosidade
+   * contra fundo escuro.
+   *
+   * Verde para receita é o mesmo tratamento que a tabela e o resumo
+   * de Lançamentos já usam — o gráfico não inventa um vocabulário
+   * visual novo.
+   */
+  --numo-chart-income: #16a34a;
+  --numo-chart-expense: #2563eb;
+}
+
+.dark {
+  --numo-chart-expense: #3b82f6;
 }

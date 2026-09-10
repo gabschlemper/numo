@@ -12,8 +12,8 @@ app/
   components/    → apresentação pura ou interações autocontidas — nunca decidem "o que fazer", só emitem intenção.
   layouts/       → moldura em volta das páginas (default = com sidebar, auth = sem sidebar, centralizado).
   middleware/    → auth.global.ts — decide quais rotas exigem sessão, nada mais.
-  pages/         → o único lugar que decide o que acontece quando o usuário age.
-  constants/      → dados de referência (categorias, contas, seed de demonstração, tamanhos de página).
+  pages/         → o único lugar que decide o que acontece quando o usuário age (Lançamentos, Listas, auth).
+  constants/      → enums fechados do domínio, seeds de demonstração e tamanhos de página.
   utils/         → funções puras (formatação de moeda/data, filtro, ordenação, resumo, descrição de filtros).
 ```
 
@@ -64,6 +64,54 @@ Os limiares em `useTransactionColumns` foram **medidos**, não chutados: cada ti
 
 **2. Seleção indexada por posição da linha.** `useTransactionSelection` mapeava `Record<índice, boolean>`. Enquanto a lista tinha ordem fixa isso funcionava; com ordenação por coluna e paginação, o índice 0 deixa de ser a mesma transação assim que você clica num cabeçalho — a seleção apontaria silenciosamente para **outras** linhas e o "Excluir" seguinte apagaria as erradas. Agora é indexada por `id` (com `:get-row-id` na tabela), e seleções que o filtro esconde são descartadas em vez de ficarem vivas invisíveis.
 
+## Listas: o que é dado do usuário e o que é código
+
+Categorias, contas e devedores eram arrays fixos em `constants/referenceOptions.ts` — ninguém criava uma categoria sem editar código. Agora são dado, atrás de `ReferenceListRepository` (porta) + `MockReferenceListRepository` (adaptador), com tela própria em `/lists`.
+
+Método, tipo, status e "a reembolsar" **continuam constantes**, de propósito: são uniões fechadas em `types/transaction.ts`. Uma forma de pagamento nova não é um registro, é mudança de tipo, de validação e de regra de resumo. Um CRUD genérico de "listas" deixaria o usuário criar o método "Boleto" e gerar lançamentos que nenhuma regra do domínio sabe classificar.
+
+Três regras da tela existem porque o dado é compartilhado com os lançamentos, e todas as três estão no adaptador (não na UI):
+
+- **Renomear propaga.** Trocar "Supermercado" por "Mercado" reescreve os lançamentos que usavam o nome antigo, e a operação devolve quantos foram — que vira a confirmação na tela. Sem isso, renomear órfã silenciosamente 34 linhas.
+- **Excluir item em uso é recusado** (`conflict` com `details.usageCount`), nunca em cascata. Apagar junto destruiria lançamentos que ninguém mandou apagar.
+- **A recusa vem com saída.** O modal de exclusão oferece mover os lançamentos para outro item na mesma operação. Uma proteção sem alternativa vira um beco sem saída que o usuário lê como bug.
+
+`usageCount` é sempre **derivado** dos lançamentos, nunca um contador guardado: um contador desincroniza na primeira exclusão que esquecer de decrementá-lo, e aí a tela promete "sem uso" logo antes de o servidor recusar.
+
+### `MockDataStore` — e por que ele é só do mock
+
+Essas regras só funcionam porque listas e lançamentos são o mesmo dado. Num backend real isso é trivial (mesma base); com dois adaptadores mock cada um segurando o próprio array, `usageCount` daria sempre zero e o rename não alcançaria nada.
+
+Então `repositories/mock/MockDataStore.ts` é o stand-in de "uma base só", compartilhado por `MockTransactionRepository` e `MockReferenceListRepository`. É **injetado no construtor** com um singleton como default: o app inteiro usa a mesma instância, e cada teste cria a sua e continua isolado.
+
+Nada fora de `repositories/mock/` importa esse arquivo — `ApiTransactionRepository` e `ApiReferenceListRepository` não vão compartilhar nada, quem garante a consistência é o servidor.
+
+## Resumo mensal: por competência, e olhando para frente
+
+A tela `/summary` agrega por `billingMonth`, **nunca** por `date`. A diferença é o motivo de ela existir: uma compra parcelada em 12x tem uma única data (o dia da compra) e doze competências. Agregada por data, ela apareceria inteira num mês só e sumiria dos onze em que o dinheiro realmente sai.
+
+Pela mesma razão, o **período padrão é assimétrico**: 5 meses para trás e 6 para frente, com o mês corrente no meio. "Últimos 12 meses" — que é o padrão óbvio e era o que o contrato dizia — esconderia justamente as parcelas futuras já comprometidas, que são as únicas sobre as quais ainda dá para agir. Ficou como preset, não como padrão.
+
+`SummaryRepository` é porta separada de `TransactionRepository` (Segregação de Interface: nenhum dos 7 métodos de lá serve ao Resumo, e no contrato são recursos distintos) e devolve o agregado **já pronto** — com backend real, somar cinco anos no navegador significa baixar cinco anos.
+
+### O gráfico
+
+Barras agrupadas, duas séries, **um eixo só**. Receita e despesa estão na mesma unidade, então dividem a escala; dois eixos y é o erro clássico que faz séries incomparáveis parecerem comparáveis. Saldo não é terceira série — é a diferença entre as duas barras, já desenhada.
+
+Mês sem lançamento vira coluna vazia, não some: um gráfico que pula mês encosta setembro em dezembro e mente sobre a tendência (é o que `monthsBetween` garante).
+
+**As cores das séries foram validadas, não escolhidas a olho.** Os tokens `--numo-chart-income` / `--numo-chart-expense` em `main.css` passaram nas seis checagens de paleta (banda de luminosidade, croma, separação para daltonismo, piso de visão normal, contraste) nos dois temas — ΔE 30.3 para deuteranopia no claro, 27.5 no escuro, contra um piso de 8. O modo escuro tem passo próprio no azul, não o mesmo valor clareado: `#2563eb` sai da banda de luminosidade contra fundo escuro. Trocar esses valores sem revalidar passa despercebido em revisão e é indistinguível para cerca de 1 em 12 leitores homens.
+
+A tabela "Mês a mês" não é redundância do gráfico: é a via de acesso para leitor de tela, daltonismo e impressão, é onde estão os valores exatos (o gráfico só rotula no hover), e é o que entrega o período inteiro num celular, onde o gráfico rola na horizontal.
+
+## Erros: `ApiError`, não string solta
+
+`types/apiError.ts` implementa o formato que `API-CONTRACT.md` define: `code`, `message`, `fields` e `details`.
+
+A diferença prática está no formulário. Antes, toda falha chegava como `Error.message` e virava toast — o que obriga o usuário a reler o formulário inteiro procurando o que está errado. Agora um nome repetido volta com `fields.name` e aparece **embaixo do input**, com o modal aberto e o texto digitado preservado; um `conflict` de item em uso volta com `details.usageCount` e a tela consegue oferecer a reatribuição em vez de só avisar que deu errado.
+
+A regra de leitura: compare sempre com `code`, nunca com `message`.
+
 ## Por que os fluxos de edição usam drawer ou modal
 
 Não foi escolha estética — cada um resolve um problema diferente:
@@ -95,7 +143,7 @@ Mesma dupla porta+adaptador da tela de Lançamentos, aplicada a sessão: `AuthRe
 ## O que falta pra virar produto de verdade
 
 1. Trocar `MockTransactionRepository` por `ApiTransactionRepository` (o único ponto de troca é `useTransactionRepository.ts`, como explicado acima) — e o mesmo para `MockAuthRepository` → `ApiAuthRepository` em `useAuthRepository.ts`.
-2. Carteira compartilhada de verdade (Gabi + Malu na mesma conta/dados) — login/cadastro/logout já existem, mas hoje são duas contas independentes, sem noção de "workspace" compartilhado.
+2. Carteira compartilhada de verdade (Gabi + Malu na mesma conta/dados) — login/cadastro/logout já existem, mas hoje são duas contas independentes. O contrato já nasce escopado por workspace (ver `API-CONTRACT.md`); falta a UI e o backend.
 3. Parsing real de planilha em `useSpreadsheetImport.ts` (hoje simulado) — trocar `simulateFileAnalysis` por um parser de `.xlsx`/`.csv` de verdade.
 4. Ordenação, paginação e resumo hoje acontecem **no cliente**, sobre a lista inteira. Com um backend real e milhares de linhas, os três viram parâmetros de query — os composables (`useTransactionSorting`, `useTransactionPagination`) já isolam esse estado num lugar só, então a troca não encosta nos componentes.
 5. Reavaliar o `routeRules` de `ssr: false` quando existir backend real com sessão via cookie (ver seção de Autenticação acima).

@@ -34,7 +34,11 @@
 import type { TransactionFilters } from '~/types/filters'
 import { areFiltersEmpty } from '~/types/filters'
 import { countActiveFilters } from '~/utils/describeFilters'
-import { CATEGORIES, ACCOUNTS, METHODS, TYPES, STATUS, DEBTORS, REIMBURSABLE_OPTIONS } from '~/constants/referenceOptions'
+// Só os enums fechados vêm de constantes; categorias/contas/devedores
+// são dado do usuário e vêm de `useReferenceOptions` (ver lá o porquê).
+import { METHODS, TYPES, STATUS, REIMBURSABLE_OPTIONS } from '~/constants/referenceOptions'
+
+const { categories, accounts, debtors } = useReferenceOptions()
 
 const filters = defineModel<TransactionFilters>({ required: true })
 
@@ -48,15 +52,15 @@ const activeCount = computed(() => countActiveFilters(filters.value))
 // arriving clean needs the rows.
 const panelOpen = ref(hasActiveFilters.value)
 
-const FIELDS = [
-  { key: 'categories', label: 'Categoria', items: CATEGORIES },
-  { key: 'accounts', label: 'Conta', items: ACCOUNTS },
+const FIELDS = computed(() => [
+  { key: 'categories', label: 'Categoria', items: categories.value },
+  { key: 'accounts', label: 'Conta', items: accounts.value },
   { key: 'methods', label: 'Método', items: METHODS },
   { key: 'types', label: 'Tipo', items: TYPES },
-  { key: 'debtors', label: 'Devedor', items: DEBTORS },
+  { key: 'debtors', label: 'Devedor', items: debtors.value },
   { key: 'status', label: 'Status', items: STATUS },
   { key: 'reimbursable', label: 'A reembolsar', items: REIMBURSABLE_OPTIONS }
-] as const
+] as const)
 </script>
 
 <template>

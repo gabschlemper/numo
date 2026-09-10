@@ -9,9 +9,14 @@
 -->
 <script setup lang="ts">
 import type { TransactionDraft, TransactionPatch } from '~/types/transaction'
-import { CATEGORIES, ACCOUNTS, METHODS, TYPES, STATUS, DEBTORS, REIMBURSABLE_OPTIONS } from '~/constants/referenceOptions'
+import { METHODS, TYPES, STATUS, REIMBURSABLE_OPTIONS } from '~/constants/referenceOptions'
 
 defineProps<{ disabled?: boolean }>()
+
+// Categorias, contas e devedores são editáveis na tela de Listas —
+// ler de constante aqui faria uma categoria recém-criada não
+// aparecer neste formulário.
+const { categories, accounts, debtors } = useReferenceOptions()
 
 const draft = defineModel<TransactionDraft | TransactionPatch>({ required: true })
 
@@ -43,12 +48,12 @@ const installment = computed<string | undefined>({
     </div>
 
     <UFormField label="Categoria" name="category">
-      <USelectMenu v-model="draft.category" :items="CATEGORIES" :disabled="disabled" class="w-full" />
+      <USelectMenu v-model="draft.category" :items="categories" :disabled="disabled" class="w-full" />
     </UFormField>
 
     <div class="grid grid-cols-2 gap-3">
       <UFormField label="Conta" name="account">
-        <USelectMenu v-model="draft.account" :items="ACCOUNTS" :disabled="disabled" class="w-full" />
+        <USelectMenu v-model="draft.account" :items="accounts" :disabled="disabled" class="w-full" />
       </UFormField>
       <UFormField label="Método" name="method">
         <USelectMenu v-model="draft.method" :items="METHODS" :disabled="disabled" class="w-full" />
@@ -66,7 +71,7 @@ const installment = computed<string | undefined>({
 
     <div class="grid grid-cols-2 gap-3">
       <UFormField label="Devedor" name="debtor" description="Sempre um terceiro — nunca você ou a Gabi.">
-        <USelectMenu v-model="draft.debtor" :items="DEBTORS" :disabled="disabled" class="w-full" />
+        <USelectMenu v-model="draft.debtor" :items="debtors" :disabled="disabled" class="w-full" />
       </UFormField>
       <UFormField label="Status" name="status">
         <USelectMenu v-model="draft.status" :items="STATUS" :disabled="disabled" class="w-full" />

@@ -26,7 +26,9 @@ withDefaults(defineProps<{ brand?: boolean }>(), { brand: true })
 const emit = defineEmits<{ navigate: [] }>()
 
 const NAV_ITEMS = [
-  { label: 'Lançamentos', to: '/transactions', icon: 'i-lucide-list' }
+  { label: 'Lançamentos', to: '/transactions', icon: 'i-lucide-list' },
+  { label: 'Resumo mensal', to: '/summary', icon: 'i-lucide-chart-column' },
+  { label: 'Listas', to: '/lists', icon: 'i-lucide-tags' }
 ]
 
 const initials = computed(() => {

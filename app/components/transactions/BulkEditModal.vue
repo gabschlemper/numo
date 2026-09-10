@@ -11,7 +11,7 @@
 -->
 <script setup lang="ts">
 import type { TransactionPatch } from '~/types/transaction'
-import { CATEGORIES, ACCOUNTS, METHODS, TYPES, STATUS, DEBTORS, REIMBURSABLE_OPTIONS } from '~/constants/referenceOptions'
+import { METHODS, TYPES, STATUS, REIMBURSABLE_OPTIONS } from '~/constants/referenceOptions'
 
 const open = defineModel<boolean>('open', { required: true })
 
@@ -22,26 +22,28 @@ const props = defineProps<{
 
 const emit = defineEmits<{ apply: [patch: TransactionPatch] }>()
 
+const { categories, accounts, debtors } = useReferenceOptions()
+
 interface EditableField {
   key: keyof TransactionPatch
   label: string
   options: string[]
 }
 
-const FIELDS: EditableField[] = [
-  { key: 'category', label: 'Categoria', options: CATEGORIES },
-  { key: 'account', label: 'Conta', options: ACCOUNTS },
+const FIELDS = computed<EditableField[]>(() => [
+  { key: 'category', label: 'Categoria', options: categories.value },
+  { key: 'account', label: 'Conta', options: accounts.value },
   { key: 'method', label: 'Método', options: METHODS },
   { key: 'type', label: 'Tipo', options: TYPES },
-  { key: 'debtor', label: 'Devedor', options: DEBTORS },
+  { key: 'debtor', label: 'Devedor', options: debtors.value },
   { key: 'status', label: 'Status', options: STATUS },
   { key: 'reimbursable', label: 'A reembolsar', options: REIMBURSABLE_OPTIONS }
-]
+])
 
 const enabled = ref<Partial<Record<keyof TransactionPatch, boolean>>>({})
 const values = ref<Partial<Record<keyof TransactionPatch, string>>>({})
 
-const activeFields = computed(() => FIELDS.filter((field) => enabled.value[field.key] && values.value[field.key]))
+const activeFields = computed(() => FIELDS.value.filter((field) => enabled.value[field.key] && values.value[field.key]))
 
 function handleOpenChange(value: boolean): void {
   open.value = value

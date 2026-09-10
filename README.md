@@ -1,8 +1,15 @@
 # Numo
 
-Protótipo funcional (frontend, dado mockado) da tela de Lançamentos e todos os seus fluxos: filtros, edição individual, edição em massa, duplicação, exclusão em massa, adição em massa e importação de planilha de faturas — além de login, cadastro, esqueci a senha e logout (também mockados).
+Protótipo funcional (frontend, dado mockado) de três telas e seus fluxos:
 
-Ver `ARCHITECTURE.md` para as decisões de organização de código (SOLID, onde cada coisa vive e por quê).
+- **Lançamentos** — filtros, busca, ordenação, paginação, resumo, edição individual e em massa, duplicação, exclusão em massa, adição em massa e importação de planilha de faturas.
+- **Resumo mensal** — receitas, despesas e saldo por mês de competência, com gráfico de tendência, ranking de gastos por categoria e período configurável.
+- **Listas** — categorias, contas e devedores editáveis, com renomeação que propaga para os lançamentos e exclusão que oferece reatribuição em vez de apagar em cascata.
+
+Mais login, cadastro, esqueci a senha e logout (também mockados).
+
+- `ARCHITECTURE.md` — decisões de organização de código (SOLID, onde cada coisa vive e por quê).
+- `API-CONTRACT.md` — o contrato dos endpoints que o backend precisa expor: payloads, filtros, formato de erro e o que muda no frontend quando existirem. Escrito a partir do que as telas realmente consomem.
 
 ## Rodando localmente
 
@@ -29,11 +36,17 @@ npm run test:coverage   # roda com relatório de cobertura (mínimo de 80% confi
 
 - `npm run dev` — servidor de desenvolvimento
 - `npm run build` — build de produção
-- `npm run typecheck` — checagem de tipos (⚠️ atualmente quebrado — ver nota abaixo)
+- `npm run typecheck` — checagem de tipos (funciona; ver nota sobre o aviso barulhento)
 - `npm run lint` — lint
 - `npm run test` / `npm run test:coverage` — testes (ver seção acima)
 
-**Nota sobre `npm run typecheck`**: hoje ele falha com `[Vue] Failed to create plugin ... plugin is not a function` (o plugin Volar `vue-router/volar/sfc-route-blocks`). Causa: `@nuxt/ui@4.11.1` e `nuxt@4.4.5` resolvem versões diferentes de `vue-router` entre si (`4.6.4` vs `5.3.1`) — um conflito entre as próprias dependências deles, não do `package.json` deste projeto (que não lista `vue-router` diretamente). Isso é independente do problema já documentado antes (remover `vue-router` como dependência direta), que ajudou mas não resolveu esse conflito de fundo. Não afeta `npm run dev`, `npm run build` nem os testes (que não passam pelo Volar) — só a checagem de tipos via `vue-tsc`.
+**Nota sobre `npm run typecheck`**: ele imprime um aviso barulhento — `[Vue] Failed to create plugin ... plugin is not a function`, do plugin Volar `vue-router/volar/sfc-route-blocks` — porque `@nuxt/ui` e `nuxt` resolvem versões diferentes de `vue-router` entre si. **O aviso é cosmético: a checagem em si funciona.** Verificado introduzindo um erro de tipo de propósito: ele reporta o arquivo e a linha e sai com código 2; sem erro, sai com 0.
+
+Ou seja: dá para confiar no resultado, só não se assuste com o stack trace no meio da saída. Para ver só o que importa:
+
+```bash
+npm run typecheck 2>&1 | grep "error TS"
+```
 
 ## Subindo para o seu GitHub
 

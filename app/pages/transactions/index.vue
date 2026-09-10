@@ -54,7 +54,16 @@ const { selection, selectedIds, selectedTransactions, selectedCount, hasSelectio
   useTransactionSelection(filteredTransactions)
 const { summary } = useTransactionSummary(filteredTransactions)
 
-await useAsyncData('initial-transactions', load)
+// As listas de categorias/contas/devedores alimentam os filtros e os
+// formulários desta tela e são editáveis em /lists — por isso são
+// carregadas, e não importadas de constante. Mesma chave que a página
+// de Listas usa, então navegar entre as duas não refaz a busca à toa.
+const { load: loadReferenceLists } = useReferenceLists()
+
+await Promise.all([
+  useAsyncData('initial-transactions', load),
+  useAsyncData('reference-lists', loadReferenceLists)
+])
 
 const hasActiveFilters = computed(() => !areFiltersEmpty(filters.value))
 

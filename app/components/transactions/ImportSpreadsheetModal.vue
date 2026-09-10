@@ -11,7 +11,6 @@ import type { StepperItem } from '@nuxt/ui'
 import type { TransactionDraft } from '~/types/transaction'
 import { countDuplicates, countErrors } from '~/types/import'
 import { useSpreadsheetImport } from '~/composables/useSpreadsheetImport'
-import { ACCOUNTS } from '~/constants/referenceOptions'
 
 const open = defineModel<boolean>('open', { required: true })
 
@@ -22,6 +21,12 @@ const emit = defineEmits<{ import: [drafts: TransactionDraft[]] }>()
 const { activeStep, account, analyzing, result, totalValid, analyze, advanceToReview, goBack, reset } = useSpreadsheetImport()
 
 const selectedFile = ref<File | null>(null)
+
+// A conta é escolhida aqui e aplicada a todas as linhas do arquivo —
+// um extrato de cartão não traz coluna de "qual cartão". A lista vem
+// da tela de Listas, não de constante: importar para uma conta
+// recém-cadastrada tem que funcionar.
+const { accounts } = useReferenceOptions()
 
 // The "done" step (3) only means something once the parent's import
 // actually succeeded — advancing to it right when the user clicks
@@ -109,7 +114,7 @@ function handleImportConfirm(): void {
 
         <USelectMenu
           v-model="account"
-          :items="ACCOUNTS"
+          :items="accounts"
           placeholder="De qual cartão/conta é essa fatura?"
           icon="i-lucide-credit-card"
         />

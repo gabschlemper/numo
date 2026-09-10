@@ -7,7 +7,7 @@
   the rows that are ready without losing the ones that aren't.
 -->
 <script setup lang="ts">
-import { CATEGORIES, ACCOUNTS, METHODS, TYPES } from '~/constants/referenceOptions'
+import { METHODS, TYPES } from '~/constants/referenceOptions'
 import { useBulkRows } from '~/composables/useBulkRows'
 import type { TransactionDraft } from '~/types/transaction'
 
@@ -18,6 +18,10 @@ const props = defineProps<{ saving: boolean }>()
 const emit = defineEmits<{ save: [drafts: TransactionDraft[]] }>()
 
 const { rows, completeRows, incompleteRows, addRow, removeRow, reset, toDrafts } = useBulkRows()
+
+// Categorias e contas são editáveis na tela de Listas; método e tipo
+// são uniões fechadas e continuam vindo de constantes.
+const { categories, accounts } = useReferenceOptions()
 
 function handleOpenChange(value: boolean): void {
   open.value = value
@@ -50,8 +54,8 @@ function handleSave(): void {
             <tr v-for="row in rows" :key="row.key">
               <td class="p-1.5"><UInput v-model="row.date" type="date" size="sm" variant="none" /></td>
               <td class="p-1.5"><UInput v-model="row.description" size="sm" variant="none" placeholder="Descrição" /></td>
-              <td class="p-1.5"><USelectMenu v-model="row.category" :items="CATEGORIES" size="sm" variant="none" placeholder="—" /></td>
-              <td class="p-1.5"><USelectMenu v-model="row.account" :items="ACCOUNTS" size="sm" variant="none" placeholder="—" /></td>
+              <td class="p-1.5"><USelectMenu v-model="row.category" :items="categories" size="sm" variant="none" placeholder="—" /></td>
+              <td class="p-1.5"><USelectMenu v-model="row.account" :items="accounts" size="sm" variant="none" placeholder="—" /></td>
               <td class="p-1.5"><USelectMenu v-model="row.method" :items="METHODS" size="sm" variant="none" placeholder="—" /></td>
               <td class="p-1.5"><UInputNumber v-model="row.amount" :min="0" :step="0.01" size="sm" variant="none" class="text-right" /></td>
               <td class="p-1.5"><USelectMenu v-model="row.type" :items="TYPES" size="sm" variant="none" placeholder="—" /></td>

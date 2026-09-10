@@ -19,7 +19,8 @@
 // for that test; remove the text and the same operation succeeds again.
 import type { Transaction, TransactionDraft, TransactionPatch, DuplicateOptions } from '~/types/transaction'
 import type { TransactionRepository } from './TransactionRepository'
-import { TRANSACTIONS_SEED } from '~/constants/transactionsSeed'
+import type { MockDataStore } from './mock/MockDataStore'
+import { sharedMockDataStore } from './mock/MockDataStore'
 
 const FORCE_ERROR_TRIGGER = 'forçar erro'
 
@@ -63,7 +64,26 @@ function throwIfForceErrorTagged(descriptions: readonly string[]): void {
 }
 
 export class MockTransactionRepository implements TransactionRepository {
-  private transactions: Transaction[] = [...TRANSACTIONS_SEED]
+  // Os lançamentos não moram mais dentro deste adaptador: eles vivem
+  // no `MockDataStore`, que este adaptador compartilha com
+  // `MockReferenceListRepository`. Sem isso, renomear uma categoria
+  // em Listas não teria como alcançar os lançamentos que a usam, e o
+  // "em uso em 34 lançamentos" contaria sempre zero. Ver o cabeçalho
+  // de `mock/MockDataStore.ts` — é um artefato só do mock; adaptadores
+  // reais não compartilham nada, o servidor é que garante isso.
+  private store: MockDataStore
+
+  constructor(store: MockDataStore = sharedMockDataStore) {
+    this.store = store
+  }
+
+  private get transactions(): Transaction[] {
+    return this.store.transactions
+  }
+
+  private set transactions(value: Transaction[]) {
+    this.store.transactions = value
+  }
 
   async list(): Promise<Transaction[]> {
     await wait(LATENCY_MS.list)
