@@ -26,7 +26,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '~': appDir,
-      '@': appDir
+      '@': appDir,
+      // Nuxt's virtual components module doesn't exist outside a Nuxt
+      // build; `tests/stubs/components.ts` explains what stands in for it.
+      '#components': fileURLToPath(new URL('./tests/stubs/components.ts', import.meta.url))
     }
   },
   test: {

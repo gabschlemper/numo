@@ -13,8 +13,8 @@ app/
   layouts/       → moldura em volta das páginas (default = com sidebar, auth = sem sidebar, centralizado).
   middleware/    → auth.global.ts — decide quais rotas exigem sessão, nada mais.
   pages/         → o único lugar que decide o que acontece quando o usuário age.
-  constants/      → dados de referência (categorias, contas, seed de demonstração).
-  utils/         → funções puras (formatação de moeda/data, filtro de lançamentos).
+  constants/      → dados de referência (categorias, contas, seed de demonstração, tamanhos de página).
+  utils/         → funções puras (formatação de moeda/data, filtro, ordenação, resumo, descrição de filtros).
 ```
 
 ## SOLID, aplicado de verdade (não só citado)
@@ -28,6 +28,41 @@ app/
 **I — Interface Segregation.** `TransactionRepository` tem só os 7 métodos que a tela de Lançamentos realmente usa (`list`, `create`, `createMany`, `update`, `updateMany`, `duplicate`, `remove`) — não é uma interface genérica "CRUD de qualquer coisa" carregando métodos que ninguém chama.
 
 **D — Dependency Inversion.** Esse é o ponto central do projeto: `pages/transactions/index.vue` e todos os composables dependem da **abstração** `TransactionRepository`, nunca da implementação concreta. `useTransactionRepository()` é o único ponto de fiação (a "composition root") — é o único arquivo que sabe que hoje estamos usando um mock.
+
+## O pipeline da lista de Lançamentos
+
+As linhas passam por quatro estágios, cada um um composable que não conhece os outros:
+
+```
+transactions → filtrar → ordenar → paginar → os DOIS renderizadores
+               (useTransactionFilters)
+                         (useTransactionSorting)
+                                    (useTransactionPagination)
+```
+
+Cada composable guarda só o **estado**; a regra em si é uma função pura em `utils/` (`filterTransactions`, `sortTransactions`, `summarizeTransactions`) — mesma divisão que já existia entre `useTransactionFilters` e `filterTransactions`, agora aplicada a tudo. É o que mantém a lógica testável sem runtime do Vue (veja `tests/unit/utils/`).
+
+Os dois renderizadores — `TransactionsTable` (telas largas) e `TransactionCardList` (celular) — recebem **o mesmo array já paginado**. Por isso é impossível o celular mostrar uma ordem diferente do desktop: não existem duas implementações de ordenação para divergirem. Esse é o motivo de a ordenação e a paginação NÃO usarem as do próprio `UTable` — a lista de cards não teria como perguntar a ordem pra ele.
+
+Seleção e resumo leem a lista **filtrada**, não a paginada: "12 selecionados" e "Saldo" são respostas sobre todo o resultado, não sobre a página que você está vendo.
+
+## Responsividade: container queries, não breakpoints de viewport
+
+Toda a adaptação de largura desta tela usa `@container` / `@min-[Xrem]:` medindo o **elemento**, não a janela.
+
+O motivo é concreto: o conteúdo divide a tela com uma sidebar de 224px. Num monitor de 1440px a lista tem ~1170px, então `xl:` (1280px de viewport) ligava colunas 110px antes de haver espaço e a tabela ganhava scroll horizontal numa tela grande. Container query pergunta a única coisa que importa — "que largura *eu* tenho" — e continua correta quando a sidebar some no tablet.
+
+Os limiares em `useTransactionColumns` foram **medidos**, não chutados: cada tier é a largura em que aquela coluna cabe sem espremer a descrição. Verificado de 360px a 1920px sem scroll horizontal em nenhuma largura.
+
+- Abaixo de ~42rem de container: a tabela não é renderizada, entra `TransactionCardList`.
+- Sempre visíveis: Data, Descrição, Valor, Status — as quatro que respondem "o que foi isso, quanto custou, já caiu".
+- As demais entram progressivamente em 46/60/74/92rem.
+
+## Dois bugs reais encontrados durante esse trabalho
+
+**1. `resolveComponent` nunca resolvia (`<ubutton>` no DOM).** As colunas usavam `resolveComponent('UButton')` / `('UBadge')` para montar células com `h()`. O auto-import de componentes do Nuxt é uma transformação de **tempo de compilação** de `<UButton>` em template — ele nunca registra o nome globalmente em runtime. Então `resolveComponent` não achava nada e caía no fallback documentado do Vue: devolver a própria string. O Vue renderizava um elemento literal `<ubutton>` — sem botão, sem badge, sem clique, e **sem erro nenhum**. Os botões de editar/excluir de cada linha e os badges de status estavam assim. A correção é importar de `#components` (`import { UBadge, UButton } from '#components'`), que é a forma suportada de alcançar esses componentes de dentro de uma render function. Nos testes, `vitest.config.ts` aponta `#components` para `tests/stubs/components.ts`.
+
+**2. Seleção indexada por posição da linha.** `useTransactionSelection` mapeava `Record<índice, boolean>`. Enquanto a lista tinha ordem fixa isso funcionava; com ordenação por coluna e paginação, o índice 0 deixa de ser a mesma transação assim que você clica num cabeçalho — a seleção apontaria silenciosamente para **outras** linhas e o "Excluir" seguinte apagaria as erradas. Agora é indexada por `id` (com `:get-row-id` na tabela), e seleções que o filtro esconde são descartadas em vez de ficarem vivas invisíveis.
 
 ## Por que os fluxos de edição usam drawer ou modal
 
@@ -53,7 +88,8 @@ Mesma dupla porta+adaptador da tela de Lançamentos, aplicada a sessão: `AuthRe
 
 - **Cores**: nenhum componente usa `text-blue-500` ou um hex direto. Tudo usa os aliases semânticos do Nuxt UI (`color="primary"`, `color="error"`, `color="success"`...) definidos uma única vez em `app/app.config.ts`. Trocar a paleta da marca é editar um arquivo, não fazer find-and-replace.
 - **Tipografia**: a fonte é declarada uma vez em `app/assets/css/main.css` (`--font-sans`), nunca inline num componente.
-- **Espaçamento/tamanho**: componentes usam a prop `size` do Nuxt UI (`xs`/`sm`/`md`) e a escala padrão do Tailwind (`gap-2`, `p-4`...) — nunca um valor mágico em pixel solto num `style=""`.
+- **Espaçamento/tamanho**: componentes usam a prop `size` do Nuxt UI (`xs`/`sm`/`md`) e a escala padrão do Tailwind (`gap-2`, `p-4`...) — nunca um valor mágico em pixel solto num `style=""`. As exceções são os limiares de container query (`@min-[60rem]`), que são medidas de layout e estão todas juntas no topo de `useTransactionColumns.ts`.
+- **Superfícies de contraste**: a barra de ações em massa usa `bg-inverted` / `text-inverted`, não `bg-neutral-900` — o token é o que mantém o contraste correto nos dois temas.
 - **Formatação de moeda/data**: `utils/formatCurrency.ts` e `utils/formatDate.ts` são os únicos lugares que sabem formatar esses tipos — nenhum componente monta `Intl.NumberFormat` ou concatena "R$" na mão.
 
 ## O que falta pra virar produto de verdade
@@ -61,5 +97,5 @@ Mesma dupla porta+adaptador da tela de Lançamentos, aplicada a sessão: `AuthRe
 1. Trocar `MockTransactionRepository` por `ApiTransactionRepository` (o único ponto de troca é `useTransactionRepository.ts`, como explicado acima) — e o mesmo para `MockAuthRepository` → `ApiAuthRepository` em `useAuthRepository.ts`.
 2. Carteira compartilhada de verdade (Gabi + Malu na mesma conta/dados) — login/cadastro/logout já existem, mas hoje são duas contas independentes, sem noção de "workspace" compartilhado.
 3. Parsing real de planilha em `useSpreadsheetImport.ts` (hoje simulado) — trocar `simulateFileAnalysis` por um parser de `.xlsx`/`.csv` de verdade.
-4. Testes unitários para as funções puras (`filterTransactions`, `isRowComplete`) — são as mais baratas de testar por não dependerem do runtime do Vue.
+4. Ordenação, paginação e resumo hoje acontecem **no cliente**, sobre a lista inteira. Com um backend real e milhares de linhas, os três viram parâmetros de query — os composables (`useTransactionSorting`, `useTransactionPagination`) já isolam esse estado num lugar só, então a troca não encosta nos componentes.
 5. Reavaliar o `routeRules` de `ssr: false` quando existir backend real com sessão via cookie (ver seção de Autenticação acima).

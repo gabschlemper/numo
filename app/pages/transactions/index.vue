@@ -4,10 +4,11 @@
   The only place in the codebase allowed to decide WHAT HAPPENS when a
   user acts (which modal opens, which composable action runs, when a
   toast fires). Every component below it is either pure presentation
-  (FiltersBar, TransactionsTable) or a self-contained interaction
-  (the modals/slideovers) that only emits intent. This is what keeps
-  each of those pieces independently testable and independently
-  reusable — none of them know this page exists.
+  (FiltersBar, TransactionsTable, TransactionCardList, ...) or a
+  self-contained interaction (the modals/slideovers) that only emits
+  intent. This is what keeps each of those pieces independently
+  testable and independently reusable — none of them know this page
+  exists.
 
   Every mutation below follows the same shape: set a `saving`/`deleting`
   flag, try the action, toast on success, catch-and-toast on failure,
@@ -17,18 +18,51 @@
   since a bulk-edit failing has to be as visible as a single edit
   failing. To manually test any of these paths, give a transaction's
   description the text "forçar erro" (see MockTransactionRepository).
+
+  The rows travel through a fixed pipeline, each stage a composable
+  that knows nothing about the others:
+
+      transactions → filter → sort → paginate → the two renderers
+
+  Both renderers (the wide table and the phone card list) consume the
+  SAME paginated array, which is why they can never disagree about
+  what's on screen. Selection and the summary read the *filtered*
+  list, not the paginated one — "12 selecionados" and "Saldo" are
+  answers about the whole result set, not about the page you happen
+  to be looking at.
+
+  The root element is the `@container` every responsive rule on this
+  screen measures against — the table/card switch here, and the
+  per-column tiers in `useTransactionColumns`. Viewport breakpoints
+  would be wrong for all of them: this element sits beside a 224px
+  sidebar on desktop and gets the full width once that sidebar
+  collapses, so "how wide is the window" and "how much room does the
+  list have" are two different numbers.
 -->
 <script setup lang="ts">
 import type { Transaction } from '~/types/transaction'
+import { areFiltersEmpty } from '~/types/filters'
 
 const toast = useToast()
 
 const { transactions, loading, error, load, createMany, update, updateMany, duplicate, remove } = useTransactions()
 const { filters, filteredTransactions, clearFilters } = useTransactionFilters(transactions)
+const { sort, sortedTransactions, toggleSort } = useTransactionSorting(filteredTransactions)
+const { page, pageSize, total, paginatedTransactions, rangeStart, rangeEnd, resetPage } =
+  useTransactionPagination(sortedTransactions)
 const { selection, selectedIds, selectedTransactions, selectedCount, hasSelection, clearSelection } =
   useTransactionSelection(filteredTransactions)
+const { summary } = useTransactionSummary(filteredTransactions)
 
 await useAsyncData('initial-transactions', load)
+
+const hasActiveFilters = computed(() => !areFiltersEmpty(filters.value))
+
+// Narrowing the list while parked on page 3 would otherwise land the
+// user on an empty page and read as "the filter found nothing".
+watch(filters, resetPage, { deep: true })
+
+const showEmptyState = computed(() => !loading.value && filteredTransactions.value.length === 0)
 
 function toastError(fallback: string, reason: unknown): void {
   const description = reason instanceof Error ? reason.message : undefined
@@ -93,10 +127,11 @@ const savingBulkEdit = ref(false)
 async function applyBulkEdit(patch: Parameters<typeof updateMany>[1]): Promise<void> {
   savingBulkEdit.value = true
   try {
+    const count = selectedIds.value.length
     await updateMany(selectedIds.value, patch)
     bulkEditOpen.value = false
     clearSelection()
-    toast.add({ title: `${selectedIds.value.length} lançamentos atualizados.`, color: 'success' })
+    toast.add({ title: `${count} lançamentos atualizados.`, color: 'success' })
   } catch (reason) {
     toastError('Não foi possível atualizar os lançamentos selecionados.', reason)
   } finally {
@@ -190,21 +225,66 @@ async function confirmImport(drafts: Parameters<typeof createMany>[0]): Promise<
     importing.value = false
   }
 }
+
+// The two secondary entry points live behind a menu below `sm`: three
+// full-label buttons don't fit a phone header, and of the three only
+// "Novo lançamento" is frequent enough to earn permanent space.
+const secondaryActions = computed(() => [
+  [
+    { label: 'Importar planilha', icon: 'i-lucide-file-down', onSelect: () => { importOpen.value = true } },
+    { label: 'Adicionar em massa', icon: 'i-lucide-table', onSelect: () => { bulkAddOpen.value = true } }
+  ]
+])
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 p-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-lg font-semibold">Lançamentos</h1>
-        <p class="text-sm text-muted">{{ transactions.length }} no total</p>
+  <div class="@container flex min-h-full flex-col gap-4 p-4 sm:p-6">
+    <header class="flex flex-wrap items-start justify-between gap-3">
+      <div class="min-w-0">
+        <h1 class="text-xl font-semibold sm:text-2xl">Lançamentos</h1>
+        <p class="text-sm text-muted">
+          <template v-if="hasActiveFilters">
+            {{ filteredTransactions.length }} de {{ transactions.length }} lançamentos
+          </template>
+          <template v-else>
+            {{ transactions.length }} {{ transactions.length === 1 ? 'lançamento' : 'lançamentos' }} no total
+          </template>
+        </p>
       </div>
-      <div class="flex gap-2">
-        <UButton label="Importar planilha" icon="i-lucide-file-down" color="neutral" variant="outline" @click="importOpen = true" />
-        <UButton label="Adicionar em massa" icon="i-lucide-table" color="neutral" variant="outline" @click="bulkAddOpen = true" />
-        <UButton label="Novo lançamento" icon="i-lucide-plus" @click="createOpen = true" />
+
+      <div class="flex shrink-0 items-center gap-2">
+        <UButton
+          label="Importar planilha"
+          icon="i-lucide-file-down"
+          color="neutral"
+          variant="outline"
+          class="hidden lg:inline-flex"
+          @click="importOpen = true"
+        />
+        <UButton
+          label="Adicionar em massa"
+          icon="i-lucide-table"
+          color="neutral"
+          variant="outline"
+          class="hidden lg:inline-flex"
+          @click="bulkAddOpen = true"
+        />
+
+        <UDropdownMenu :items="secondaryActions" class="lg:hidden">
+          <UButton
+            icon="i-lucide-ellipsis-vertical"
+            color="neutral"
+            variant="outline"
+            aria-label="Mais ações: importar planilha ou adicionar em massa"
+          />
+        </UDropdownMenu>
+
+        <UButton icon="i-lucide-plus" @click="createOpen = true">
+          <span class="hidden sm:inline">Novo lançamento</span>
+          <span class="sm:hidden">Novo</span>
+        </UButton>
       </div>
-    </div>
+    </header>
 
     <UAlert
       v-if="error && transactions.length === 0"
@@ -216,7 +296,65 @@ async function confirmImport(drafts: Parameters<typeof createMany>[0]): Promise<
       :actions="[{ label: 'Tentar de novo', color: 'error', variant: 'solid', onClick: load }]"
     />
 
+    <!--
+      A failure that happens *while* data is already on screen can't
+      take over the page — the rows below are still valid. It gets a
+      quieter banner instead, so the user knows the last action
+      didn't stick without losing what they were looking at.
+    -->
+    <UAlert
+      v-else-if="error"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-alert-triangle"
+      title="A última ação não foi concluída."
+      :description="error"
+      :actions="[{ label: 'Recarregar', color: 'warning', variant: 'outline', onClick: load }]"
+    />
+
+    <TransactionsSummary :summary="summary" :filtered="hasActiveFilters" :loading="loading" />
+
     <FiltersBar v-model="filters" @clear="clearFilters" />
+
+    <TransactionsEmptyState
+      v-if="showEmptyState"
+      :filtered="hasActiveFilters"
+      :search="filters.search"
+      @clear="clearFilters"
+      @create="createOpen = true"
+      @import="importOpen = true"
+    />
+
+    <template v-else>
+      <TransactionsTable
+        v-model:selection="selection"
+        :rows="paginatedTransactions"
+        :loading="loading"
+        :sort="sort"
+        class="hidden @min-[42rem]:block"
+        @edit="openEdit"
+        @delete="openSingleDelete"
+        @sort="toggleSort"
+      />
+
+      <TransactionCardList
+        v-model:selection="selection"
+        :rows="paginatedTransactions"
+        :loading="loading"
+        class="@min-[42rem]:hidden"
+        @edit="openEdit"
+        @delete="openSingleDelete"
+      />
+
+      <TransactionsPagination
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :range-start="rangeStart"
+        :range-end="rangeEnd"
+        :total="total"
+        :grand-total="transactions.length"
+      />
+    </template>
 
     <BulkActionsBar
       v-if="hasSelection"
@@ -225,14 +363,6 @@ async function confirmImport(drafts: Parameters<typeof createMany>[0]): Promise<
       @duplicate="duplicateOpen = true"
       @delete="openBulkDelete"
       @clear="clearSelection"
-    />
-
-    <TransactionsTable
-      v-model:selection="selection"
-      :rows="filteredTransactions"
-      :loading="loading"
-      @edit="openEdit"
-      @delete="openSingleDelete"
     />
 
     <EditTransactionSlideover

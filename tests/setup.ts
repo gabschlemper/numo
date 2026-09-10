@@ -16,11 +16,17 @@
 // tests — in the real app that persistence across calls is the point;
 // in tests it would silently couple test cases together.
 import { beforeEach, vi } from 'vitest'
-import { ref, computed, readonly, type Ref } from 'vue'
+import { ref, computed, readonly, watch, nextTick, type Ref } from 'vue'
 
 vi.stubGlobal('ref', ref)
 vi.stubGlobal('computed', computed)
 vi.stubGlobal('readonly', readonly)
+// `watch` joined the list when pagination and selection started
+// reacting to the list shrinking under them. Outside a component
+// instance Vue queues these on the microtask queue, so tests that
+// assert on a watcher's effect have to `await nextTick()` first.
+vi.stubGlobal('watch', watch)
+vi.stubGlobal('nextTick', nextTick)
 
 const stateRegistry = new Map<string, Ref>()
 
